@@ -71,7 +71,10 @@ class VerificadorResultados {
         
         // Adiciona cookie PHPSESSID se fornecido
         if ($this->phpsessid) {
+            // Usa PHPSESSID fornecido (da variável de ambiente)
             curl_setopt($ch, CURLOPT_COOKIE, "PHPSESSID=" . $this->phpsessid);
+            // Também adiciona outros cookies comuns que podem ajudar
+            curl_setopt($ch, CURLOPT_COOKIE, "PHPSESSID=" . $this->phpsessid . "; __cf_bm=; __cfruid=");
         } else {
             // Tenta fazer uma requisição inicial para obter cookies do Cloudflare
             // Cria diretório temporário se não existir
@@ -134,8 +137,16 @@ class VerificadorResultados {
         }
         
         if ($httpCode !== 200) {
+            // Verifica se é bloqueio do Cloudflare
+            if ($httpCode === 403 && (strpos($html, 'Cloudflare') !== false || strpos($html, 'challenge') !== false)) {
+                return [
+                    'erro' => 'Cloudflare bloqueou a requisição. O IP do servidor (' . ($_SERVER['SERVER_ADDR'] ?? 'desconhecido') . ') pode estar na blacklist. Tente: 1) Atualizar PHPSESSID, 2) Usar outro servidor, ou 3) Aguardar algumas horas.',
+                    'dados' => []
+                ];
+            }
+            
             return [
-                'erro' => "Erro HTTP {$httpCode}: " . ($html ?: 'Resposta vazia do servidor'),
+                'erro' => "Erro HTTP {$httpCode}: " . (strlen($html) > 200 ? substr($html, 0, 200) . '...' : ($html ?: 'Resposta vazia do servidor')),
                 'dados' => []
             ];
         }
