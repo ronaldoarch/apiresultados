@@ -3,11 +3,17 @@
 
 FROM php:8.1-apache
 
-# Instalar extensões PHP necessárias
-RUN docker-php-ext-install curl dom
+# Instalar dependências do sistema
+RUN apt-get update && apt-get install -y \
+    libcurl4-openssl-dev \
+    libxml2-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Habilitar módulo rewrite do Apache
-RUN a2enmod rewrite
+# Instalar extensões PHP necessárias
+RUN docker-php-ext-install curl dom xml
+
+# Habilitar módulos do Apache
+RUN a2enmod rewrite headers
 
 # Copiar arquivos para o servidor
 COPY . /var/www/html/

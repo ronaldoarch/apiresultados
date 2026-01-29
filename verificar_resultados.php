@@ -16,6 +16,14 @@ class VerificadorResultados {
      * Busca resultados de uma loteria
      */
     public function buscarResultados($codigoLoteria, $data) {
+        // Verifica se cURL está disponível
+        if (!function_exists('curl_init')) {
+            return [
+                'erro' => 'Extensão cURL não está disponível. Instale php-curl.',
+                'dados' => []
+            ];
+        }
+        
         $ch = curl_init();
         
         curl_setopt_array($ch, [
@@ -27,9 +35,13 @@ class VerificadorResultados {
             ]),
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_HTTPHEADER => [
                 'Content-Type: application/x-www-form-urlencoded',
-                'User-Agent: Mozilla/5.0 (compatible; JogoBicho/1.0)'
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
             ]
         ]);
         
@@ -40,10 +52,28 @@ class VerificadorResultados {
         
         $html = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
         curl_close($ch);
         
-        if ($httpCode !== 200 || !$html) {
-            return ['erro' => 'Erro ao buscar resultados', 'dados' => []];
+        if ($html === false || !empty($curlError)) {
+            return [
+                'erro' => 'Erro de conexão: ' . ($curlError ?: 'Falha ao conectar com o servidor'),
+                'dados' => []
+            ];
+        }
+        
+        if ($httpCode !== 200) {
+            return [
+                'erro' => "Erro HTTP {$httpCode}: " . ($html ?: 'Resposta vazia do servidor'),
+                'dados' => []
+            ];
+        }
+        
+        if (empty($html)) {
+            return [
+                'erro' => 'Resposta vazia do servidor',
+                'dados' => []
+            ];
         }
         
         // Verifica erros
@@ -63,6 +93,14 @@ class VerificadorResultados {
      */
     private function extrairResultados($html, $codigoLoteria) {
         $resultados = [];
+        
+        // Verifica se DOM está disponível
+        if (!class_exists('DOMDocument')) {
+            return [
+                'erro' => 'Extensão DOM não está disponível. Instale php-xml.',
+                'dados' => []
+            ];
+        }
         
         // Usa DOMDocument para parsear HTML
         libxml_use_internal_errors(true);
