@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador de Apostas - Direto (Sem Servidor)</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .alert {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            display: none;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .resultado {
+            margin-top: 20px;
+            padding: 20px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .resultado.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+        
+        .resultado.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+        
+        .acerto-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Verificador de Apostas</h1>
+        <p class="subtitle">Versão que funciona direto do navegador (evita bloqueio Cloudflare)</p>
+        
+        <div class="alert">
+            ⚠️ <strong>Modo Direto:</strong> Esta versão faz requisições diretamente do seu navegador para o bichocerto.com, 
+            evitando bloqueios do Cloudflare no servidor.
+        </div>
+        
+        <form id="formVerificacao">
+            <div class="form-group">
+                <label for="loteria">Loteria</label>
+                <select id="loteria" required>
+                    <option value="ln">Loteria Nacional (LN)</option>
+                    <option value="fd">Loteria Federal (FD)</option>
+                    <option value="sp">PT-SP / Bandeirantes (SP)</option>
+                    <option value="bs">Boa Sorte Goiás (BS)</option>
+                    <option value="lce">Lotece (LCE)</option>
+                    <option value="lk">Look Goiás (LK)</option>
+                    <option value="pb">PT Paraíba / Lotep (PB)</option>
+                    <option value="m">Milionária (M)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="data">Data do Sorteio</label>
+                <input type="date" id="data" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="numeros">Números Apostados</label>
+                <input 
+                    type="text" 
+                    id="numeros"
+                    placeholder="Ex: 2047, 2881, 2289"
+                    required
+                >
+                <small style="color: #999; display: block; margin-top: 5px;">
+                    Separe os números por vírgula ou espaço
+                </small>
+            </div>
+            
+            <button type="submit" class="btn" id="btnVerificar">
+                🔍 Verificar Apostas
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            ⏳ Verificando...
+        </div>
+        
+        <div class="resultado" id="resultado"></div>
+    </div>
+    
+    <script>
+        // Define data padrão como hoje
+        document.getElementById('data').valueAsDate = new Date();
+        
+        // URL direta do bichocerto.com (sem passar pelo servidor)
+        const BICHOCERTO_URL = 'https://bichocerto.com/resultados/base/resultado/';
+        
+        document.getElementById('formVerificacao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loteria = document.getElementById('loteria').value;
+            const data = document.getElementById('data').value;
+            const numerosTexto = document.getElementById('numeros').value;
+            
+            // Processa números
+            const numeros = numerosTexto
+                .split(/[, ]+/)
+                .map(n => n.trim())
+                .filter(n => n.length > 0);
+            
+            if (numeros.length === 0) {
+                mostrarResultado('error', 'Por favor, informe pelo menos um número.');
+                return;
+            }
+            
+            // Mostra loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('resultado').style.display = 'none';
+            document.getElementById('btnVerificar').disabled = true;
+            
+            try {
+                // Busca resultados diretamente do bichocerto.com
+                const resultados = await buscarResultadosDireto(loteria, data);
+                
+                if (resultados.erro) {
+                    mostrarResultado('error', `Erro: ${resultados.erro}`);
+                    return;
+                }
+                
+                // Verifica acertos
+                const acertos = verificarAcertos(resultados.dados, numeros);
+                
+                if (acertos.length === 0) {
+                    mostrarResultado('error', 'Nenhum número encontrado nos resultados.');
+                } else {
+                    mostrarResultadoVerificacao({
+                        total_apostado: numeros.length,
+                        total_acertos: acertos.length,
+                        acertos: acertos
+                    });
+                }
+                
+            } catch (error) {
+                mostrarResultado('error', `Erro: ${error.message}`);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('btnVerificar').disabled = false;
+            }
+        });
+        
+        // Função para buscar resultados diretamente do bichocerto.com
+        async function buscarResultadosDireto(loteria, data) {
+            const formData = new URLSearchParams();
+            formData.append('l', loteria);
+            formData.append('d', data);
+            
+            try {
+                const response = await fetch(BICHOCERTO_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formData,
+                    credentials: 'include' // Inclui cookies do navegador
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+                
+                const html = await response.text();
+                
+                // Verifica se foi bloqueado pelo Cloudflare
+                if (html.includes('Cloudflare') || html.includes('challenge') || html.includes('Just a moment')) {
+                    throw new Error('Cloudflare bloqueou a requisição. Tente acessar bichocerto.com no navegador primeiro.');
+                }
+                
+                // Parse HTML
+                return parsearHTML(html, loteria);
+                
+            } catch (error) {
+                return {
+                    erro: error.message,
+                    dados: []
+                };
+            }
+        }
+        
+        // Função para parsear HTML e extrair resultados
+        function parsearHTML(html, codigoLoteria) {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            const resultados = {};
+            
+            // Encontra todas as divs de resultado
+            const divs = doc.querySelectorAll('[id^="div_display_"]');
+            
+            divs.forEach(div => {
+                const divId = div.id;
+                const match = divId.match(/div_display_(\d+)/);
+                if (!match) return;
+                
+                const horarioId = match[1];
+                const tableId = `table_${horarioId}`;
+                const tabela = div.querySelector(`#${tableId}`);
+                
+                if (!tabela) return;
+                
+                // Extrai título
+                const tituloNode = div.querySelector('h5.card-title');
+                const titulo = tituloNode ? tituloNode.textContent.trim() : `Extração ${horarioId}`;
+                
+                // Extrai prêmios
+                const premios = [];
+                const linhas = tabela.querySelectorAll('tr');
+                
+                linhas.forEach((linha) => {
+                    const colunas = linha.querySelectorAll('td');
+                    if (colunas.length < 4) return;
+                    
+                    // Extrai posição
+                    const posicaoNode = linha.querySelector('.bg-dark');
+                    let posicao = null;
+                    if (posicaoNode) {
+                        const posicaoMatch = posicaoNode.textContent.match(/(\d+)/);
+                        if (posicaoMatch) {
+                            posicao = parseInt(posicaoMatch[1]);
+                        }
+                    }
+                    
+                    // Extrai número
+                    const numNode = colunas[2].querySelector('a, h5');
+                    if (!numNode) return;
+                    
+                    let numero = null;
+                    
+                    // Para Federal: extrai baseado na posição
+                    if (codigoLoteria === 'fd' && numNode.tagName === 'A') {
+                        const href = numNode.getAttribute('href');
+                        if (href) {
+                            if (posicao >= 1 && posicao <= 5) {
+                                const match = href.match(/[?&]m=(\d{5})/);
+                                if (match) numero = match[1];
+                            } else if (posicao === 6) {
+                                const match = href.match(/[?&]m=(\d{4})/);
+                                if (match) numero = match[1];
+                            } else if (posicao === 7) {
+                                const match = href.match(/[?&]c=(\d{3})/);
+                                if (match) numero = match[1];
+                            }
+                        }
+                    }
+                    
+                    // Se não encontrou na URL, tenta do texto
+                    if (!numero) {
+                        const numeroTexto = numNode.textContent.trim().replace(/[.\s,]/g, '');
+                        const match = numeroTexto.match(/(\d{3,5})/);
+                        if (match) numero = match[1];
+                    }
+                    
+                    if (numero) {
+                        premios.push({
+                            numero: numero,
+                            animal: colunas.length > 4 ? colunas[4].textContent.trim() : '',
+                            grupo: colunas.length > 3 ? colunas[3].textContent.trim() : '',
+                            posicao: posicao
+                        });
+                    }
+                });
+                
+                if (premios.length > 0) {
+                    resultados[horarioId] = {
+                        titulo: titulo,
+                        horario: horarioId,
+                        premios: premios
+                    };
+                }
+            });
+            
+            return {
+                erro: null,
+                dados: resultados
+            };
+        }
+        
+        // Função para verificar acertos
+        function verificarAcertos(dados, numerosApostados) {
+            const acertos = [];
+            
+            Object.values(dados).forEach(extracao => {
+                extracao.premios.forEach((premio, index) => {
+                    const numNormalizado = ltrim(premio.numero, '0');
+                    
+                    numerosApostados.forEach(numApostado => {
+                        const numApostadoNormalizado = ltrim(numApostado, '0');
+                        
+                        if (numNormalizado === numApostadoNormalizado) {
+                            acertos.push({
+                                numero: numApostado,
+                                horario: extracao.titulo,
+                                posicao: (index + 1) + 'º',
+                                animal: premio.animal,
+                                grupo: premio.grupo
+                            });
+                        }
+                    });
+                });
+            });
+            
+            return acertos;
+        }
+        
+        // Helper function
+        function ltrim(str, char) {
+            return str.replace(new RegExp('^' + char + '+'), '');
+        }
+        
+        function mostrarResultado(tipo, mensagem) {
+            const div = document.getElementById('resultado');
+            div.className = `resultado ${tipo}`;
+            div.innerHTML = `<p>${mensagem}</p>`;
+            div.style.display = 'block';
+        }
+        
+        function mostrarResultadoVerificacao(dados) {
+            const div = document.getElementById('resultado');
+            div.className = 'resultado success';
+            
+            let html = `
+                <h3>🎉 Resultado da Verificação</h3>
+                <p><strong>Total de números apostados:</strong> ${dados.total_apostado}</p>
+                <p><strong>Total de acertos:</strong> ${dados.total_acertos}</p>
+            `;
+            
+            if (dados.acertos.length > 0) {
+                html += '<h4 style="margin-top: 20px;">✅ Números Acertados:</h4>';
+                dados.acertos.forEach(acerto => {
+                    html += `
+                        <div class="acerto-item">
+                            <strong>${acerto.numero}</strong> - ${acerto.posicao} lugar<br>
+                            <small>${acerto.animal} (Grupo ${acerto.grupo}) - ${acerto.horario}</small>
+                        </div>
+                    `;
+                });
+            }
+            
+            div.innerHTML = html;
+            div.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
