@@ -17,10 +17,14 @@ require_once 'verificar_resultados.php';
 // Tenta obter PHPSESSID de variável de ambiente (para Coolify/Docker) ou configuração direta
 $phpsessid = $_ENV['PHPSESSID'] ?? getenv('PHPSESSID') ?? null;
 
+// Tenta obter PROXY_URL de variável de ambiente (para contornar bloqueio Cloudflare)
+$proxyUrl = $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
+
 // Se não encontrou em variável de ambiente, pode configurar diretamente aqui:
 // $phpsessid = '45c16270330406d85326a05c4058334b';
+// $proxyUrl = 'https://outro-servidor.com'; // URL do servidor proxy (sem /proxy.php)
 
-$verificador = new VerificadorResultados($phpsessid);
+$verificador = new VerificadorResultados($phpsessid, $proxyUrl);
 $metodo = $_SERVER['REQUEST_METHOD'];
 $acao = $_GET['acao'] ?? '';
 
