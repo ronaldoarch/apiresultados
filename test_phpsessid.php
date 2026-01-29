@@ -87,6 +87,18 @@ header('Content-Type: text/html; charset=utf-8');
             echo '<pre>' . json_encode($resultado, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . '</pre>';
         } else {
             echo '<p style="color: red;">❌ Erro: ' . htmlspecialchars($resultado['erro']) . '</p>';
+            
+            // Mostra informações sobre proxy se disponível
+            $proxyUrl = $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
+            if (!$proxyUrl) {
+                echo '<div style="background: #fff3cd; padding: 15px; margin-top: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">';
+                echo '<strong>💡 Solução:</strong> Configure PROXY_URL no Coolify para usar outro servidor como proxy.';
+                echo '</div>';
+            } else {
+                echo '<div style="background: #d1ecf1; padding: 15px; margin-top: 15px; border-radius: 5px; border-left: 4px solid #0c5460;">';
+                echo '<strong>ℹ️ Proxy configurado:</strong> ' . htmlspecialchars($proxyUrl);
+                echo '</div>';
+            }
         }
         echo '</div>';
     }

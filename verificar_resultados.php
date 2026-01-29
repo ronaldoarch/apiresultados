@@ -147,8 +147,14 @@ class VerificadorResultados {
         if ($httpCode !== 200) {
             // Verifica se é bloqueio do Cloudflare
             if ($httpCode === 403 && (strpos($html, 'Cloudflare') !== false || strpos($html, 'challenge') !== false)) {
+                // Tenta extrair o IP que o Cloudflare vê
+                $cloudflareIP = 'desconhecido';
+                if (preg_match('/Your IP[^<]*?(\d+\.\d+\.\d+\.\d+)/i', $html, $ipMatch)) {
+                    $cloudflareIP = $ipMatch[1];
+                }
+                
                 return [
-                    'erro' => 'Cloudflare bloqueou a requisição. O IP do servidor (' . ($_SERVER['SERVER_ADDR'] ?? 'desconhecido') . ') pode estar na blacklist. Tente: 1) Atualizar PHPSESSID, 2) Usar outro servidor, ou 3) Aguardar algumas horas.',
+                    'erro' => 'Cloudflare bloqueou a requisição. O IP público de saída (' . $cloudflareIP . ') está na blacklist. Soluções: 1) Aguardar 4-6 horas, 2) Usar proxy em outro servidor (configure PROXY_URL), ou 3) Usar outro servidor para a API.',
                     'dados' => []
                 ];
             }
