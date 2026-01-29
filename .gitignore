@@ -1,0 +1,33 @@
+# Arquivos do sistema
+.DS_Store
+._*
+Thumbs.db
+
+# Arquivos temporários
+*.tmp
+*.log
+*.cache
+federal_raw.html
+
+# Configurações locais
+config.local.php
+.env
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+logs/
+*.log
+
+# Arquivos de teste
+test_*.php
+*_test.php
+
+# Backup
+*.bak
+*.backup

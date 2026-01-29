@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verificador de Apostas - Jogo do Bicho</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #666;
+            margin-bottom: 30px;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #555;
+            font-weight: 600;
+        }
+        
+        select, input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        select:focus, input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .numeros-input {
+            font-family: monospace;
+        }
+        
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #667eea;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .resultado {
+            margin-top: 30px;
+            padding: 20px;
+            border-radius: 10px;
+            display: none;
+        }
+        
+        .resultado.success {
+            background: #d4edda;
+            border: 2px solid #28a745;
+            display: block;
+        }
+        
+        .resultado.error {
+            background: #f8d7da;
+            border: 2px solid #dc3545;
+            display: block;
+        }
+        
+        .resultado.info {
+            background: #d1ecf1;
+            border: 2px solid #17a2b8;
+            display: block;
+        }
+        
+        .acerto-item {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border-left: 4px solid #28a745;
+        }
+        
+        .acerto-item .numero {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .acerto-item .info {
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .resumo {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        .resumo .total {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎯 Verificador de Apostas</h1>
+        <p class="subtitle">Verifique seus números do Jogo do Bicho</p>
+        
+        <form id="formVerificacao">
+            <div class="form-group">
+                <label for="loteria">Loteria:</label>
+                <select id="loteria" name="loteria" required>
+                    <option value="ln">Loteria Nacional</option>
+                    <option value="sp">PT-SP/Bandeirantes</option>
+                    <option value="bs">Boa Sorte Goiás</option>
+                    <option value="lce">Lotece</option>
+                    <option value="lk">Look Goiás</option>
+                    <option value="pb">PT Paraíba/Lotep</option>
+                    <option value="ba">PT Bahia</option>
+                    <option value="fd">Loteria Federal</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="data">Data:</label>
+                <input type="date" id="data" name="data" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="numeros">Números Apostados (separados por vírgula):</label>
+                <input 
+                    type="text" 
+                    id="numeros" 
+                    name="numeros" 
+                    class="numeros-input"
+                    placeholder="Ex: 2047, 2881, 2289"
+                    required
+                >
+                <small style="color: #999; display: block; margin-top: 5px;">
+                    Separe os números por vírgula ou espaço
+                </small>
+            </div>
+            
+            <button type="submit" class="btn" id="btnVerificar">
+                🔍 Verificar Apostas
+            </button>
+        </form>
+        
+        <div class="loading" id="loading">
+            ⏳ Verificando...
+        </div>
+        
+        <div class="resultado" id="resultado"></div>
+    </div>
+    
+    <script>
+        // Define data padrão como hoje
+        document.getElementById('data').valueAsDate = new Date();
+        
+        // API endpoint - AJUSTE AQUI SEU CAMINHO
+        const API_URL = 'api_resultados.php';
+        
+        document.getElementById('formVerificacao').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const loteria = document.getElementById('loteria').value;
+            const data = document.getElementById('data').value;
+            const numerosTexto = document.getElementById('numeros').value;
+            
+            // Processa números (remove espaços, separa por vírgula)
+            const numeros = numerosTexto
+                .split(/[, ]+/)
+                .map(n => n.trim())
+                .filter(n => n.length > 0);
+            
+            if (numeros.length === 0) {
+                mostrarResultado('error', 'Por favor, informe pelo menos um número.');
+                return;
+            }
+            
+            // Mostra loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('resultado').style.display = 'none';
+            document.getElementById('btnVerificar').disabled = true;
+            
+            try {
+                // Faz requisição para API
+                const response = await fetch(`${API_URL}?acao=verificar`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        loteria: loteria,
+                        data: data,
+                        numeros: numeros
+                    })
+                });
+                
+                const resultado = await response.json();
+                
+                if (resultado.sucesso) {
+                    mostrarResultadoVerificacao(resultado);
+                } else {
+                    mostrarResultado('error', `Erro: ${resultado.erro || 'Erro desconhecido'}`);
+                }
+                
+            } catch (error) {
+                mostrarResultado('error', `Erro ao verificar: ${error.message}`);
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+                document.getElementById('btnVerificar').disabled = false;
+            }
+        });
+        
+        function mostrarResultadoVerificacao(dados) {
+            const div = document.getElementById('resultado');
+            div.className = 'resultado';
+            
+            let html = `
+                <div class="resumo">
+                    <div>Total de Apostas: <span class="total">${dados.total_apostado}</span></div>
+                    <div style="margin-top: 10px;">Total de Acertos: <span class="total" style="color: #28a745;">${dados.total_acertos}</span></div>
+                </div>
+            `;
+            
+            if (dados.total_acertos > 0) {
+                div.className = 'resultado success';
+                html += '<h3>🎉 Acertos Encontrados:</h3>';
+                
+                dados.acertos.forEach(acerto => {
+                    html += `
+                        <div class="acerto-item">
+                            <div class="numero">${acerto.numero}</div>
+                            <div class="info">
+                                <strong>${acerto.posicao} lugar</strong> em ${acerto.horario}<br>
+                                ${acerto.animal} (Grupo ${acerto.grupo})
+                            </div>
+                        </div>
+                    `;
+                });
+            } else {
+                div.className = 'resultado info';
+                html += '<p style="text-align: center; font-size: 18px;">❌ Nenhum acerto encontrado.</p>';
+                html += '<p style="text-align: center; color: #666; margin-top: 10px;">Verifique se a data está correta e se os resultados já foram publicados.</p>';
+            }
+            
+            div.innerHTML = html;
+            div.style.display = 'block';
+        }
+        
+        function mostrarResultado(tipo, mensagem) {
+            const div = document.getElementById('resultado');
+            div.className = `resultado ${tipo}`;
+            div.innerHTML = `<p>${mensagem}</p>`;
+            div.style.display = 'block';
+        }
+    </script>
+</body>
+</html>
