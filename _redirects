@@ -1,0 +1,5 @@
+# Cloudflare Pages Redirects
+# Redireciona requisições de API para servidor PHP externo
+# (Configure a URL do seu servidor PHP abaixo)
+
+/api/* https://seu-servidor-php.com/api_resultados.php/:splat 200

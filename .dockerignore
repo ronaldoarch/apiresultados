@@ -1,0 +1,22 @@
+# Arquivos a ignorar no build Docker
+.git
+.gitignore
+README.md
+*.md
+.DS_Store
+._*
+node_modules/
+venv/
+__pycache__/
+*.log
+federal_raw.html
+COMO_*.md
+DEPLOY_*.md
+GUIA_*.md
+EXEMPLO_*.md
+OPCOES_*.md
+INTEGRACAO_*.md
+ESTRUTURA_*.md
+EXPLICACAO_*.md
+INICIAR_*.md
+README_*.md
