@@ -26,6 +26,23 @@ class VerificadorResultados {
         
         $ch = curl_init();
         
+        // Headers para simular navegador real e passar pelo Cloudflare
+        $headers = [
+            'Content-Type: application/x-www-form-urlencoded',
+            'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Accept-Encoding: gzip, deflate, br',
+            'Connection: keep-alive',
+            'Upgrade-Insecure-Requests: 1',
+            'Sec-Fetch-Dest: document',
+            'Sec-Fetch-Mode: navigate',
+            'Sec-Fetch-Site: none',
+            'Sec-Fetch-User: ?1',
+            'Cache-Control: max-age=0',
+            'Referer: https://bichocerto.com/'
+        ];
+        
         curl_setopt_array($ch, [
             CURLOPT_URL => $this->baseUrl,
             CURLOPT_POST => true,
@@ -39,15 +56,38 @@ class VerificadorResultados {
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
-            CURLOPT_HTTPHEADER => [
-                'Content-Type: application/x-www-form-urlencoded',
-                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-            ]
+            CURLOPT_ENCODING => 'gzip, deflate, br',
+            CURLOPT_HTTPHEADER => $headers,
+            CURLOPT_COOKIEJAR => '/tmp/cookies.txt',
+            CURLOPT_COOKIEFILE => '/tmp/cookies.txt'
         ]);
         
         // Adiciona cookie PHPSESSID se fornecido
         if ($this->phpsessid) {
             curl_setopt($ch, CURLOPT_COOKIE, "PHPSESSID=" . $this->phpsessid);
+        } else {
+            // Tenta fazer uma requisição inicial para obter cookies do Cloudflare
+            $chPreflight = curl_init();
+            curl_setopt_array($chPreflight, [
+                CURLOPT_URL => 'https://bichocerto.com',
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+                CURLOPT_COOKIEJAR => '/tmp/cookies.txt',
+                CURLOPT_COOKIEFILE => '/tmp/cookies.txt',
+                CURLOPT_HTTPHEADER => [
+                    'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language: pt-BR,pt;q=0.9'
+                ]
+            ]);
+            curl_exec($chPreflight);
+            curl_close($chPreflight);
+            // Pequeno delay para não parecer bot
+            usleep(500000); // 0.5 segundos
         }
         
         $html = curl_exec($ch);
