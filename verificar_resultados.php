@@ -259,6 +259,11 @@ class VerificadorResultados {
                         // 1º a 5º: números de 5 dígitos (parâmetro m=)
                         if (preg_match('/[?&]m=(\d{5})/', $href, $urlMatch)) {
                             $numero = $urlMatch[1];
+                        } else {
+                            // Fallback: tenta buscar qualquer m= com 5 dígitos
+                            if (preg_match('/[?&]m=(\d{5})/', $href, $urlMatch)) {
+                                $numero = $urlMatch[1];
+                            }
                         }
                     } elseif ($posicao == 6) {
                         // 6º: números de 4 dígitos (parâmetro m=)
@@ -271,10 +276,20 @@ class VerificadorResultados {
                             $numero = $urlMatch[1];
                         }
                     }
+                    
+                    // Para Federal, se não encontrou na URL, NÃO faz fallback para texto
+                    // pois o texto pode conter números do bicho (4 dígitos) ao invés dos números corretos
+                    if (!$numero && $codigoLoteria === 'fd') {
+                        // Tenta uma última vez: verifica se há algum parâmetro numérico na URL
+                        // que possa ser o número correto
+                        if (preg_match('/[?&](m|c)=(\d{3,5})/', $href, $urlMatch)) {
+                            $numero = $urlMatch[2];
+                        }
+                    }
                 }
                 
-                // Se não encontrou na URL ou não é Federal, tenta do texto
-                if (!$numero) {
+                // Se não encontrou na URL e NÃO é Federal, tenta do texto
+                if (!$numero && $codigoLoteria !== 'fd') {
                     $numeroTexto = trim($numNode->textContent);
                     // Remove pontos e espaços, depois busca números de 3 a 5 dígitos
                     $numeroTexto = str_replace(['.', ' ', ','], '', $numeroTexto);
