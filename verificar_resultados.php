@@ -7,9 +7,12 @@
 class VerificadorResultados {
     private $baseUrl = "https://bichocerto.com/resultados/base/resultado/";
     private $phpsessid = null;
+    private $proxyUrl = null;
     
-    public function __construct($phpsessid = null) {
+    public function __construct($phpsessid = null, $proxyUrl = null) {
         $this->phpsessid = $phpsessid;
+        // Tenta obter proxy de variável de ambiente
+        $this->proxyUrl = $proxyUrl ?? $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
     }
     
     /**
@@ -22,6 +25,11 @@ class VerificadorResultados {
                 'erro' => 'Extensão cURL não está disponível. Instale php-curl.',
                 'dados' => []
             ];
+        }
+        
+        // Se tem proxy configurado, usa proxy
+        if ($this->proxyUrl) {
+            return $this->buscarViaProxy($codigoLoteria, $data);
         }
         
         $ch = curl_init();
@@ -337,6 +345,53 @@ class VerificadorResultados {
             'total_acertos' => count($acertos),
             'acertos' => $acertos
         ];
+    }
+    
+    /**
+     * Busca resultados via proxy (quando IP está bloqueado)
+     */
+    private function buscarViaProxy($codigoLoteria, $data) {
+        $proxyUrl = rtrim($this->proxyUrl, '/') . '/proxy.php';
+        $url = $proxyUrl . '?loteria=' . urlencode($codigoLoteria) . '&data=' . urlencode($data);
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 30,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        if ($response === false || !empty($curlError)) {
+            return [
+                'erro' => 'Erro ao conectar com proxy: ' . ($curlError ?: 'Falha na conexão'),
+                'dados' => []
+            ];
+        }
+        
+        if ($httpCode !== 200) {
+            return [
+                'erro' => "Erro HTTP {$httpCode} do proxy",
+                'dados' => []
+            ];
+        }
+        
+        // Se proxy retornou JSON com erro
+        $jsonResponse = json_decode($response, true);
+        if ($jsonResponse && isset($jsonResponse['erro'])) {
+            return $jsonResponse;
+        }
+        
+        // Parse HTML retornado pelo proxy
+        return $this->extrairResultados($response, $codigoLoteria);
     }
 }
 
