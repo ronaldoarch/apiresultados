@@ -57,37 +57,68 @@ class VerificadorResultados {
             CURLOPT_SSL_VERIFYPEER => false,
             CURLOPT_SSL_VERIFYHOST => false,
             CURLOPT_ENCODING => 'gzip, deflate, br',
-            CURLOPT_HTTPHEADER => $headers,
-            CURLOPT_COOKIEJAR => '/tmp/cookies.txt',
-            CURLOPT_COOKIEFILE => '/tmp/cookies.txt'
+            CURLOPT_HTTPHEADER => $headers
         ]);
+        
+        // Configura cookies se já tiver arquivo de cookies
+        if (!$this->phpsessid) {
+            $cookieFile = sys_get_temp_dir() . '/bichocerto_cookies_' . md5($this->baseUrl) . '.txt';
+            if (file_exists($cookieFile)) {
+                curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
+                curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+            }
+        }
         
         // Adiciona cookie PHPSESSID se fornecido
         if ($this->phpsessid) {
             curl_setopt($ch, CURLOPT_COOKIE, "PHPSESSID=" . $this->phpsessid);
         } else {
             // Tenta fazer uma requisição inicial para obter cookies do Cloudflare
+            // Cria diretório temporário se não existir
+            $cookieFile = sys_get_temp_dir() . '/bichocerto_cookies_' . md5($this->baseUrl) . '.txt';
+            
             $chPreflight = curl_init();
             curl_setopt_array($chPreflight, [
                 CURLOPT_URL => 'https://bichocerto.com',
                 CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 10,
-                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_TIMEOUT => 15,
+                CURLOPT_CONNECTTIMEOUT => 10,
                 CURLOPT_FOLLOWLOCATION => true,
+                CURLOPT_MAXREDIRS => 5,
                 CURLOPT_SSL_VERIFYPEER => false,
                 CURLOPT_SSL_VERIFYHOST => false,
-                CURLOPT_COOKIEJAR => '/tmp/cookies.txt',
-                CURLOPT_COOKIEFILE => '/tmp/cookies.txt',
+                CURLOPT_COOKIEJAR => $cookieFile,
+                CURLOPT_COOKIEFILE => $cookieFile,
+                CURLOPT_ENCODING => 'gzip, deflate, br',
                 CURLOPT_HTTPHEADER => [
                     'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Language: pt-BR,pt;q=0.9'
+                    'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                    'Accept-Language: pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+                    'Accept-Encoding: gzip, deflate, br',
+                    'Connection: keep-alive',
+                    'Upgrade-Insecure-Requests: 1',
+                    'Sec-Fetch-Dest: document',
+                    'Sec-Fetch-Mode: navigate',
+                    'Sec-Fetch-Site: none',
+                    'Sec-Fetch-User: ?1'
                 ]
             ]);
-            curl_exec($chPreflight);
+            
+            $preflightResponse = curl_exec($chPreflight);
+            $preflightCode = curl_getinfo($chPreflight, CURLINFO_HTTP_CODE);
             curl_close($chPreflight);
-            // Pequeno delay para não parecer bot
-            usleep(500000); // 0.5 segundos
+            
+            // Se o preflight foi bloqueado, tenta continuar mesmo assim
+            if ($preflightCode === 403 || strpos($preflightResponse, 'Cloudflare') !== false) {
+                // Cloudflare bloqueou, mas vamos tentar mesmo assim com delay maior
+                sleep(2);
+            } else {
+                // Pequeno delay para não parecer bot
+                usleep(1000000); // 1 segundo
+            }
+            
+            // Usa os cookies obtidos na requisição principal
+            curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
         }
         
         $html = curl_exec($ch);
