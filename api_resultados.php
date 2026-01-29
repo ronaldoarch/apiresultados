@@ -14,11 +14,13 @@ header('Access-Control-Allow-Headers: Content-Type');
 require_once 'verificar_resultados.php';
 
 // Configuração
-$config = [
-    'phpsessid' => null // Configure aqui se necessário
-];
+// Tenta obter PHPSESSID de variável de ambiente (para Coolify/Docker) ou configuração direta
+$phpsessid = $_ENV['PHPSESSID'] ?? getenv('PHPSESSID') ?? null;
 
-$verificador = new VerificadorResultados($config['phpsessid']);
+// Se não encontrou em variável de ambiente, pode configurar diretamente aqui:
+// $phpsessid = '45c16270330406d85326a05c4058334b';
+
+$verificador = new VerificadorResultados($phpsessid);
 $metodo = $_SERVER['REQUEST_METHOD'];
 $acao = $_GET['acao'] ?? '';
 
