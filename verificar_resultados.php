@@ -368,7 +368,10 @@ class VerificadorResultados {
             CURLOPT_CONNECTTIMEOUT => 10,
             CURLOPT_FOLLOWLOCATION => true,
             CURLOPT_SSL_VERIFYPEER => false,
-            CURLOPT_SSL_VERIFYHOST => false
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_HTTPHEADER => [
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]
         ]);
         
         $response = curl_exec($ch);
@@ -378,14 +381,14 @@ class VerificadorResultados {
         
         if ($response === false || !empty($curlError)) {
             return [
-                'erro' => 'Erro ao conectar com proxy: ' . ($curlError ?: 'Falha na conexão'),
+                'erro' => 'Erro ao conectar com proxy: ' . ($curlError ?: 'Falha na conexão') . ' (URL: ' . $url . ')',
                 'dados' => []
             ];
         }
         
         if ($httpCode !== 200) {
             return [
-                'erro' => "Erro HTTP {$httpCode} do proxy",
+                'erro' => "Erro HTTP {$httpCode} do proxy. Resposta: " . substr($response, 0, 200),
                 'dados' => []
             ];
         }
@@ -394,6 +397,14 @@ class VerificadorResultados {
         $jsonResponse = json_decode($response, true);
         if ($jsonResponse && isset($jsonResponse['erro'])) {
             return $jsonResponse;
+        }
+        
+        // Verifica se retornou HTML do Cloudflare (bloqueio)
+        if (strpos($response, 'Cloudflare') !== false || strpos($response, 'challenge') !== false) {
+            return [
+                'erro' => 'Proxy também está bloqueado pelo Cloudflare. Tente outro servidor ou aguarde algumas horas.',
+                'dados' => []
+            ];
         }
         
         // Parse HTML retornado pelo proxy
