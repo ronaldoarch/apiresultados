@@ -8,11 +8,14 @@ class VerificadorResultados {
     private $baseUrl = "https://bichocerto.com/resultados/base/resultado/";
     private $phpsessid = null;
     private $proxyUrl = null;
+    private $proxyscotchUrl = null;
     
-    public function __construct($phpsessid = null, $proxyUrl = null) {
+    public function __construct($phpsessid = null, $proxyUrl = null, $proxyscotchUrl = null) {
         $this->phpsessid = $phpsessid;
-        // Tenta obter proxy de variável de ambiente
+        // Tenta obter proxy de variável de ambiente (proxy.php customizado)
         $this->proxyUrl = $proxyUrl ?? $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
+        // Proxyscotch (hoppscotch/proxyscotch) - proxy genérico em Go
+        $this->proxyscotchUrl = $proxyscotchUrl ?? $_ENV['PROXYSCOTCH_URL'] ?? getenv('PROXYSCOTCH_URL') ?? null;
     }
     
     /**
@@ -27,7 +30,10 @@ class VerificadorResultados {
             ];
         }
         
-        // Se tem proxy configurado, usa proxy
+        // Prioridade: Proxyscotch > proxy.php > direto
+        if ($this->proxyscotchUrl) {
+            return $this->buscarViaProxyscotch($codigoLoteria, $data);
+        }
         if ($this->proxyUrl) {
             return $this->buscarViaProxy($codigoLoteria, $data);
         }
@@ -365,6 +371,105 @@ class VerificadorResultados {
             'total_acertos' => count($acertos),
             'acertos' => $acertos
         ];
+    }
+    
+    /**
+     * Busca resultados via Proxyscotch (hoppscotch/proxyscotch)
+     * Proxyscotch é um proxy HTTP genérico em Go que recebe POST com JSON:
+     * {"Method":"POST","Url":"...","Headers":{},"Data":"l=ln&d=2026-03-17"}
+     * e retorna {"success":true,"status":200,"data":"<html>..."}
+     */
+    private function buscarViaProxyscotch($codigoLoteria, $data) {
+        $proxyBase = rtrim($this->proxyscotchUrl, '/');
+        $postData = http_build_query(['l' => $codigoLoteria, 'd' => $data]);
+        
+        $payload = [
+            'Method' => 'POST',
+            'Url' => $this->baseUrl,
+            'Headers' => [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language' => 'pt-BR,pt;q=0.9',
+                'Referer' => 'https://bichocerto.com/'
+            ],
+            'Data' => $postData,
+            'Params' => []
+        ];
+        
+        $token = $_ENV['PROXYSCOTCH_TOKEN'] ?? getenv('PROXYSCOTCH_TOKEN') ?? null;
+        if ($token) {
+            $payload['AccessToken'] = $token;
+        }
+        
+        $ch = curl_init();
+        curl_setopt_array($ch, [
+            CURLOPT_URL => $proxyBase . '/',
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => json_encode($payload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 35,
+            CURLOPT_CONNECTTIMEOUT => 10,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_SSL_VERIFYPEER => false,
+            CURLOPT_SSL_VERIFYHOST => false,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ]
+        ]);
+        
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlError = curl_error($ch);
+        curl_close($ch);
+        
+        if ($response === false || !empty($curlError)) {
+            return [
+                'erro' => 'Erro ao conectar com Proxyscotch: ' . ($curlError ?: 'Falha na conexão') . ' (URL: ' . $proxyBase . ')',
+                'dados' => []
+            ];
+        }
+        
+        $jsonResponse = json_decode($response, true);
+        if (!$jsonResponse) {
+            return [
+                'erro' => 'Resposta inválida do Proxyscotch (não é JSON). HTTP ' . $httpCode,
+                'dados' => []
+            ];
+        }
+        
+        if (isset($jsonResponse['success']) && $jsonResponse['success'] === false) {
+            $msg = $jsonResponse['data']['message'] ?? $jsonResponse['data'] ?? 'Erro desconhecido';
+            return [
+                'erro' => 'Proxyscotch: ' . (is_string($msg) ? $msg : json_encode($msg)),
+                'dados' => []
+            ];
+        }
+        
+        if ($jsonResponse['status'] !== 200) {
+            return [
+                'erro' => 'Proxyscotch retornou HTTP ' . ($jsonResponse['status'] ?? $httpCode),
+                'dados' => []
+            ];
+        }
+        
+        $html = $jsonResponse['data'] ?? '';
+        if (empty($html)) {
+            return [
+                'erro' => 'Proxyscotch retornou resposta vazia',
+                'dados' => []
+            ];
+        }
+        
+        if (strpos($html, 'Cloudflare') !== false || strpos($html, 'challenge') !== false) {
+            return [
+                'erro' => 'Proxyscotch também recebeu bloqueio Cloudflare. O IP do servidor Proxyscotch pode estar na blacklist.',
+                'dados' => []
+            ];
+        }
+        
+        return $this->extrairResultados($html, $codigoLoteria);
     }
     
     /**

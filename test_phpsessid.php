@@ -37,7 +37,9 @@ header('Content-Type: text/html; charset=utf-8');
     
     // Teste 2: Verificar se está sendo usado
     require_once 'verificar_resultados.php';
-    $verificador = new VerificadorResultados($phpsessid_env);
+    $proxyUrl = $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
+    $proxyscotchUrl = $_ENV['PROXYSCOTCH_URL'] ?? getenv('PROXYSCOTCH_URL') ?? null;
+    $verificador = new VerificadorResultados($phpsessid_env, $proxyUrl, $proxyscotchUrl);
     
     // Usar reflection para verificar propriedade privada
     $reflection = new ReflectionClass($verificador);
@@ -89,14 +91,16 @@ header('Content-Type: text/html; charset=utf-8');
             echo '<p style="color: red;">❌ Erro: ' . htmlspecialchars($resultado['erro']) . '</p>';
             
             // Mostra informações sobre proxy se disponível
-            $proxyUrl = $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
-            if (!$proxyUrl) {
+            if (!$proxyscotchUrl && !$proxyUrl) {
                 echo '<div style="background: #fff3cd; padding: 15px; margin-top: 15px; border-radius: 5px; border-left: 4px solid #ffc107;">';
-                echo '<strong>💡 Solução:</strong> Configure PROXY_URL no Coolify para usar outro servidor como proxy.';
+                echo '<strong>💡 Solução:</strong> Configure PROXYSCOTCH_URL ou PROXY_URL no Coolify para usar outro servidor como proxy.';
                 echo '</div>';
             } else {
                 echo '<div style="background: #d1ecf1; padding: 15px; margin-top: 15px; border-radius: 5px; border-left: 4px solid #0c5460;">';
-                echo '<strong>ℹ️ Proxy configurado:</strong> ' . htmlspecialchars($proxyUrl);
+                echo '<strong>ℹ️ Proxy configurado:</strong> ';
+                if ($proxyscotchUrl) echo 'Proxyscotch: ' . htmlspecialchars($proxyscotchUrl);
+                if ($proxyscotchUrl && $proxyUrl) echo ' | ';
+                if ($proxyUrl) echo 'proxy.php: ' . htmlspecialchars($proxyUrl);
                 echo '</div>';
             }
         }

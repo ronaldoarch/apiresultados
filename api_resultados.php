@@ -17,14 +17,18 @@ require_once 'verificar_resultados.php';
 // Tenta obter PHPSESSID de variável de ambiente (para Coolify/Docker) ou configuração direta
 $phpsessid = $_ENV['PHPSESSID'] ?? getenv('PHPSESSID') ?? null;
 
-// Tenta obter PROXY_URL de variável de ambiente (para contornar bloqueio Cloudflare)
+// Tenta obter PROXY_URL de variável de ambiente (proxy.php customizado)
 $proxyUrl = $_ENV['PROXY_URL'] ?? getenv('PROXY_URL') ?? null;
+
+// Proxyscotch (hoppscotch/proxyscotch) - proxy genérico em Go, prioridade sobre PROXY_URL
+$proxyscotchUrl = $_ENV['PROXYSCOTCH_URL'] ?? getenv('PROXYSCOTCH_URL') ?? null;
 
 // Se não encontrou em variável de ambiente, pode configurar diretamente aqui:
 // $phpsessid = '45c16270330406d85326a05c4058334b';
-// $proxyUrl = 'https://outro-servidor.com'; // URL do servidor proxy (sem /proxy.php)
+// $proxyUrl = 'https://outro-servidor.com'; // URL do proxy.php (sem /proxy.php)
+// $proxyscotchUrl = 'https://proxyscotch-xxx.agenclamidas.co'; // URL do Proxyscotch
 
-$verificador = new VerificadorResultados($phpsessid, $proxyUrl);
+$verificador = new VerificadorResultados($phpsessid, $proxyUrl, $proxyscotchUrl);
 $metodo = $_SERVER['REQUEST_METHOD'];
 $acao = $_GET['acao'] ?? '';
 
