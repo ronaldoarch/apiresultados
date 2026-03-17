@@ -79,10 +79,7 @@ class VerificadorResultados {
         
         // Adiciona cookie PHPSESSID se fornecido
         if ($this->phpsessid) {
-            // Usa PHPSESSID fornecido (da variável de ambiente)
             curl_setopt($ch, CURLOPT_COOKIE, "PHPSESSID=" . $this->phpsessid);
-            // Também adiciona outros cookies comuns que podem ajudar
-            curl_setopt($ch, CURLOPT_COOKIE, "PHPSESSID=" . $this->phpsessid . "; __cf_bm=; __cfruid=");
         } else {
             // Tenta fazer uma requisição inicial para obter cookies do Cloudflare
             // Cria diretório temporário se não existir
@@ -259,11 +256,6 @@ class VerificadorResultados {
                         // 1º a 5º: números de 5 dígitos (parâmetro m=)
                         if (preg_match('/[?&]m=(\d{5})/', $href, $urlMatch)) {
                             $numero = $urlMatch[1];
-                        } else {
-                            // Fallback: tenta buscar qualquer m= com 5 dígitos
-                            if (preg_match('/[?&]m=(\d{5})/', $href, $urlMatch)) {
-                                $numero = $urlMatch[1];
-                            }
                         }
                     } elseif ($posicao == 6) {
                         // 6º: números de 4 dígitos (parâmetro m=)
@@ -340,11 +332,18 @@ class VerificadorResultados {
         foreach ($dados as $horarioId => $extracao) {
             $premios = $extracao['premios'];
             $numerosSorteados = array_column($premios, 'numero');
-            
+
             foreach ($numerosApostados as $numApostado) {
-                $numNormalizado = str_pad(ltrim($numApostado, '0'), strlen($numApostado), '0', STR_PAD_LEFT);
-                
-                $posicao = array_search($numNormalizado, $numerosSorteados);
+                $numApostadoNorm = ltrim(preg_replace('/\D/', '', $numApostado), '0') ?: '0';
+
+                $posicao = false;
+                foreach ($numerosSorteados as $i => $numSorteado) {
+                    $numSorteadoNorm = ltrim(preg_replace('/\D/', '', $numSorteado), '0') ?: '0';
+                    if ($numApostadoNorm === $numSorteadoNorm) {
+                        $posicao = $i;
+                        break;
+                    }
+                }
                 if ($posicao !== false) {
                     $premio = $premios[$posicao];
                     $acertos[] = [
@@ -428,31 +427,30 @@ class VerificadorResultados {
 }
 
 // ============================================
-// EXEMPLOS DE USO
+// EXEMPLOS DE USO (só executa quando rodado diretamente)
 // ============================================
+$scriptName = $_SERVER['argv'][0] ?? $_SERVER['SCRIPT_FILENAME'] ?? '';
+$isMainScript = (php_sapi_name() === 'cli' && strpos($scriptName, 'verificar_resultados') !== false);
+if ($isMainScript) {
+    $verificador = new VerificadorResultados();
+    $hoje = date('Y-m-d');
+    $resultados = $verificador->buscarResultados('ln', $hoje);
 
-// Exemplo 1: Buscar resultados
-$verificador = new VerificadorResultados();
+    if (empty($resultados['erro'])) {
+        echo "Resultados encontrados:\n";
+        foreach ($resultados['dados'] as $horario => $extracao) {
+            echo "{$extracao['titulo']}: " . count($extracao['premios']) . " prêmios\n";
+        }
+    }
 
-$hoje = date('Y-m-d');
-$resultados = $verificador->buscarResultados('ln', $hoje);
+    $apostas = ['2047', '2881', '2289'];
+    $verificacao = $verificador->verificarAposta('ln', $hoje, $apostas);
 
-if (empty($resultados['erro'])) {
-    echo "Resultados encontrados:\n";
-    foreach ($resultados['dados'] as $horario => $extracao) {
-        echo "{$extracao['titulo']}: " . count($extracao['premios']) . " prêmios\n";
+    if ($verificacao['sucesso']) {
+        echo "\nAcertos: {$verificacao['total_acertos']}\n";
+        foreach ($verificacao['acertos'] as $acerto) {
+            echo "✅ {$acerto['numero']} - {$acerto['posicao']} lugar\n";
+        }
     }
 }
-
-// Exemplo 2: Verificar apostas
-$apostas = ['2047', '2881', '2289'];
-$verificacao = $verificador->verificarAposta('ln', $hoje, $apostas);
-
-if ($verificacao['sucesso']) {
-    echo "\nAcertos: {$verificacao['total_acertos']}\n";
-    foreach ($verificacao['acertos'] as $acerto) {
-        echo "✅ {$acerto['numero']} - {$acerto['posicao']} lugar\n";
-    }
-}
-
 ?>
