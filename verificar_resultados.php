@@ -462,7 +462,12 @@ class VerificadorResultados {
             ];
         }
         
-        if (strpos($html, 'Cloudflare') !== false || strpos($html, 'challenge') !== false) {
+        // Só considera bloqueio se NÃO tiver resultados (bichocerto usa Cloudflare no HTML normal)
+        $temResultados = (strpos($html, 'div_display_') !== false || strpos($html, 'card-title') !== false);
+        $pareceBloqueio = (strpos($html, 'Cloudflare') !== false || strpos($html, 'challenge') !== false)
+            && (strpos($html, 'Just a moment') !== false || strpos($html, 'cf-browser-verification') !== false || strpos($html, 'Checking your browser') !== false);
+        
+        if ($pareceBloqueio && !$temResultados) {
             return [
                 'erro' => 'Proxyscotch também recebeu bloqueio Cloudflare. O IP do servidor Proxyscotch pode estar na blacklist.',
                 'dados' => []
@@ -518,8 +523,14 @@ class VerificadorResultados {
             return $jsonResponse;
         }
         
-        // Verifica se retornou HTML do Cloudflare (bloqueio)
-        if (strpos($response, 'Cloudflare') !== false || strpos($response, 'challenge') !== false) {
+        // Verifica se retornou página de bloqueio Cloudflare (não confundir com menções normais no HTML)
+        // O bichocerto.com usa Cloudflare - o HTML normal pode conter "Cloudflare" em scripts/CDN
+        // Só é bloqueio real se NÃO tiver a estrutura de resultados (div_display_, card-title)
+        $temResultados = (strpos($response, 'div_display_') !== false || strpos($response, 'card-title') !== false);
+        $pareceBloqueio = (strpos($response, 'Cloudflare') !== false || strpos($response, 'challenge') !== false)
+            && (strpos($response, 'Just a moment') !== false || strpos($response, 'cf-browser-verification') !== false || strpos($response, 'Checking your browser') !== false);
+        
+        if ($pareceBloqueio && !$temResultados) {
             return [
                 'erro' => 'Proxy também está bloqueado pelo Cloudflare. Tente outro servidor ou aguarde algumas horas.',
                 'dados' => []
